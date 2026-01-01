@@ -3,6 +3,7 @@ package org.nsa;
 import uk.co.caprica.vlcj.player.base.MediaPlayer;
 import uk.co.caprica.vlcj.player.base.MediaPlayerEventAdapter;
 import uk.co.caprica.vlcj.player.component.EmbeddedMediaPlayerComponent;
+import uk.co.caprica.vlcj.player.embedded.fullscreen.adaptive.AdaptiveFullScreenStrategy;
 
 import javax.swing.*;
 
@@ -23,16 +24,23 @@ public class Main {
     private final JButton skipButton;
     private final JButton muteButton;
     private JSlider volumeSlider;
-    private final JButton dfVolButton;
+//    private final JButton dfVolButton;
     private JSlider speedSlider;
     private JButton resetSpeedBtn;
     private JLabel speedLabel;
     private JProgressBar progressBar;
     private JLabel timeLabel;
+    private JLabel volLabel;
+    private  JButton fullScreenButton;
+    private JButton openButton;
+    private JButton snapshotButton;
+    private static boolean fullScreen = false;
+
     private final EmbeddedMediaPlayerComponent mediaPlayerComponent;
 
     public static void main(String[] args) {
-        new Main(args);
+        // Run on the Event Dispatch Thread for Swing safety
+        SwingUtilities.invokeLater(() -> new Main(args));
     }
 
     private String formatTime(long millis) {
@@ -54,16 +62,41 @@ public class Main {
         mediaPlayerComponent.mediaPlayer().controls().setPosition(pos);
         progressBar.setValue((int)(pos * 100));
     }
+    private  void openFileExprorer(){
+        JFileChooser fileChooser = new JFileChooser(new java.io.File(System.getProperty("user.home") + java.io.File.separator + "Videos"));
+//        fileChooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter());
+        int result = fileChooser.showOpenDialog(frame);
+        if (result == JFileChooser.APPROVE_OPTION) {
+            String filePath = fileChooser.getSelectedFile().getAbsolutePath();
+
+            // Stop any current video before playing a new one
+            mediaPlayerComponent.mediaPlayer().controls().stop();
+
+            // Play the new file
+            mediaPlayerComponent.mediaPlayer().media().play(filePath);
+//            progressBar.setValue(0);
+        }
+    }
 
     public Main(String[] args){
         this.thisApp = this;
 
-        this.frame = new JFrame("My First Media Player");
+
+        this.frame = new JFrame("NSA Media Player");
         frame.setBounds(100, 100, 600, 400);
+        try {
+            java.net.URL iconURL = getClass().getResource("/NSA_MEDIA_PLAYER_ICON.png");
+            if (iconURL != null) {
+                ImageIcon icon = new ImageIcon(iconURL);
+                frame.setIconImage(icon.getImage());
+            }
+        }catch (Exception e){
+            System.out.println("icon" + e.getMessage());
+        }
 //        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         mediaPlayerComponent = new EmbeddedMediaPlayerComponent();
-
+        mediaPlayerComponent.mediaPlayer().fullScreen().strategy(new AdaptiveFullScreenStrategy(frame));
         mediaPlayerComponent.mediaPlayer().events().addMediaPlayerEventListener(new MediaPlayerEventAdapter() {
             @Override
             public void positionChanged(MediaPlayer mediaPlayer, float newPosition) {
@@ -79,20 +112,22 @@ public class Main {
                     timeLabel.setText(String.format("%s / %s (Left: %s)", formatTime(current), formatTime(total), formatTime(total-current)));
             }
 
-//            @Override
-//            public void playing(MediaPlayer mediaPlayer) {
-//            }
-//            @Override
-//            public void stopped(MediaPlayer mediaPlayer) {
-//
-//            }
-//            @Override
-//            public void paused(MediaPlayer mediaPlayer) {
-//
-//            }
+            @Override
+            public void playing(MediaPlayer mediaPlayer) {
+                String mrl = mediaPlayer.media().info().mrl();
+                frame.setTitle("NSAMP Playing: " + mrl.substring(mrl.lastIndexOf("/") + 1));
+            }
+            @Override
+            public void stopped(MediaPlayer mediaPlayer) {
+                frame.setTitle("NSA Media Player");
+            }
+            @Override
+            public void paused(MediaPlayer mediaPlayer) {
+            }
 
             @Override
             public void finished(MediaPlayer mediaPlayer) {
+//                frame.setTitle("NSA Media Player");
 
                 SwingUtilities.invokeLater(new Runnable() {
                     @Override
@@ -137,7 +172,8 @@ public class Main {
         contentPane.add(mediaPlayerComponent, BorderLayout.CENTER);
 
         JPanel controlsPane = new JPanel();
-        JPanel progressPanel = new JPanel(new BorderLayout(1, 0));
+        JPanel progressPanel = new JPanel();
+        progressPanel.setLayout(new BorderLayout());
 
         progressBar = new JProgressBar(0, 100);
         progressBar.setStringPainted(false);
@@ -166,9 +202,18 @@ public class Main {
         progressPanel.add(progressBar, BorderLayout.CENTER);
 
 // Finally, add this progressPanel to the top of your main controlsPane
-        controlsPane.add(progressPanel, BorderLayout.NORTH);
-
+//        controlsPane.add(progressPanel, BorderLayout.NORTH);
+        contentPane.add(progressPanel, BorderLayout.NORTH);
         JPanel buttonPane = new JPanel();
+
+        openButton = new JButton("Open File");
+        buttonPane.add(openButton);
+        openButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                openFileExprorer();
+            }
+        });
 
         pauseButton = new JButton("Play/Pause");
         buttonPane.add(pauseButton);
@@ -182,6 +227,26 @@ public class Main {
                     mediaPlayerComponent.mediaPlayer().controls().pause();
 
                 }
+            }
+        });
+
+        fullScreenButton = new JButton("Full Screen");
+        buttonPane.add(fullScreenButton);
+        fullScreenButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+
+                mediaPlayerComponent.mediaPlayer().fullScreen().toggle();
+                fullScreen = !fullScreen;
+                speedSlider.setVisible(!fullScreen);
+                speedLabel.setVisible(!fullScreen);
+                resetSpeedBtn.setVisible(!fullScreen);
+                if(fullScreen){
+                    fullScreenButton.setText("Exit Full Screen");
+                }else {
+                    fullScreenButton.setText("Full Screen");
+                }
+
             }
         });
 
@@ -222,14 +287,15 @@ public class Main {
 // 2. Slider Logic
         volumeSlider.addChangeListener(e -> {
             int volume = volumeSlider.getValue();
+            volLabel.setText("vol: " + volume + "%");
             mediaPlayerComponent.mediaPlayer().audio().setVolume(volume);
-            // Optional: update a label if you have one, e.g., volLabel.setText(volume + "%");
+            // Optional: update a label if you have one, e.g.,
         });
 
 // 3. Mute Button (Toggles mute)
         muteButton = new JButton("Mute");
 
-        dfVolButton = new JButton("DfVol");
+//        dfVolButton = new JButton("DfVol");
 
         muteButton.addActionListener(e -> {
             // 1. Get current state and flip it
@@ -241,20 +307,25 @@ public class Main {
 
             // 3. Sync the UI to the NEW state
             volumeSlider.setEnabled(!newState);
-            dfVolButton.setEnabled(!newState);
+//            dfVolButton.setEnabled(!newState);
+            volLabel.setText(newState ? "muted" : "vol: " + volumeSlider.getValue() + "%");
             muteButton.setText(newState ? "Unmute" : "Mute");
         });
 
 // 4. Default Volume Button (100%)
-        dfVolButton.addActionListener(e -> {
-            volumeSlider.setValue(100); // This automatically triggers the ChangeListener
-        });
+//        dfVolButton.addActionListener(e -> {
+//            volumeSlider.setValue(100); // This automatically triggers the ChangeListener
+//        });
+
+        volLabel = new JLabel("vol: " + volumeSlider.getValue() + "%");
+
 
 //        buttonPane.add(muteButton);
         JPanel volPane = new JPanel();
         volPane.add(muteButton);
+        volPane.add(volLabel);
         volPane.add(volumeSlider);
-        volPane.add(dfVolButton);
+//        volPane.add(dfVolButton);
 
         progressPanel.add(volPane, BorderLayout.EAST);
 //        buttonPane.add(dfVolButton);
@@ -284,6 +355,7 @@ public class Main {
             float snappedRate = (Math.round(source.getValue() / 5.0f) * 5) / 100.0f;
 
             // Update the label immediately so the user sees the numbers change while dragging
+
             speedLabel.setText(String.format("Speed: %.2fx", snappedRate));
 
             // Only tell the Media Player to change once the user lets go of the mouse
@@ -296,14 +368,48 @@ public class Main {
         resetSpeedBtn.addActionListener(e -> {
             // Simply moving the slider will trigger the ChangeListener above
             speedSlider.setValue(100);
+            volumeSlider.setValue(100);
+//            progressBar.setValue(0);
+            mediaPlayerComponent.mediaPlayer().audio().setMute(false);
+
+            // 3. Sync the UI to the NEW state
+            volumeSlider.setEnabled(true);
+//            dfVolButton.setEnabled(!newState);
+            volLabel.setText( "vol: " + volumeSlider.getValue() + "%");
+            muteButton.setText( "Mute");
         });
         buttonPane.add(resetSpeedBtn);
+
+
+        snapshotButton = new JButton("Snapshot");
+        buttonPane.add(snapshotButton);
+
+        snapshotButton.addActionListener(e -> {
+            // 1. Define where to save the image (e.g., your "Pictures" folder)
+            String userHome = System.getProperty("user.home");
+            String path = userHome + java.io.File.separator + "Pictures" + java.io.File.separator + "nsavlc_snapshot_" + System.currentTimeMillis() + ".png";
+
+            java.io.File file = new java.io.File(path);
+
+            // 2. Take the snapshot
+            // You can specify width and height (0, 0 means original video size)
+            boolean success = mediaPlayerComponent.mediaPlayer().snapshots().save(file, 0, 0);
+
+            if (success) {
+                // Optional: Show a popup to the user
+                JOptionPane.showMessageDialog(frame, "Snapshot saved to Pictures folder!");
+            } else {
+                JOptionPane.showMessageDialog(frame, "Failed to save Snapshot!");
+            }
+        });
+
+
         controlsPane.add(buttonPane, BorderLayout.CENTER);
 
         contentPane.add(controlsPane, BorderLayout.SOUTH);
 
         frame.setContentPane(contentPane);
         frame.setVisible(true);
-        mediaPlayerComponent.mediaPlayer().media().play(args[0]);
+//        mediaPlayerComponent.mediaPlayer().media().play(args[0]);
     }
 }
