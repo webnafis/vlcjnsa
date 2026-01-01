@@ -40,7 +40,7 @@ public class Main {
 
     public static void main(String[] args) {
         // Run on the Event Dispatch Thread for Swing safety
-        SwingUtilities.invokeLater(() -> new Main(args));
+        SwingUtilities.invokeLater(() -> new Main());
     }
 
     private String formatTime(long millis) {
@@ -78,21 +78,20 @@ public class Main {
         }
     }
 
-    public Main(String[] args){
+    public Main(){
         this.thisApp = this;
+
+
+
 
 
         this.frame = new JFrame("NSA Media Player");
         frame.setBounds(100, 100, 600, 400);
-        try {
             java.net.URL iconURL = getClass().getResource("/NSA_MEDIA_PLAYER_ICON.png");
             if (iconURL != null) {
                 ImageIcon icon = new ImageIcon(iconURL);
                 frame.setIconImage(icon.getImage());
             }
-        }catch (Exception e){
-            System.out.println("icon" + e.getMessage());
-        }
 //        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         mediaPlayerComponent = new EmbeddedMediaPlayerComponent();
@@ -411,5 +410,7 @@ public class Main {
         frame.setContentPane(contentPane);
         frame.setVisible(true);
 //        mediaPlayerComponent.mediaPlayer().media().play(args[0]);
+
+
     }
 }
